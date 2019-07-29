@@ -89,18 +89,9 @@ Task("ReleaseNotes")
 
         Information(string.Join("\n", redirectedOutput));
         
-        if (string.IsNullOrEmpty(System.IO.File.ReadAllText("./artifacts/releasenotes.md")))
-            System.IO.File.WriteAllText("./artifacts/releasenotes.md", "No issues closed since last release");
-
-        var settings = new GitReleaseNotesSettings
-        {
-            Verbose                  = true,
-            IssueTracker             = GitReleaseNotesIssueTracker.GitHub,
-            AllTags                  = true,
-            Version                  = versionInfo.NuGetVersionV2,
-            AllLabels                = true
-        };
-        GitReleaseNotes(releaseNotesFile, settings);
+        if (string.IsNullOrEmpty(System.IO.File.ReadAllText(releaseNotesFile)))
+            System.IO.File.WriteAllText(releaseNotesFile, "No issues closed since last release");
+        Information($"Release notes generated into {releaseNotesFile}");
     });
 
 Task("Pack")
@@ -117,8 +108,26 @@ Task("Pack")
         DotNetCorePack(projectFile, settings);
     });
 
+Task("Publish")
+    .IsDependentOn("Pack")
+    .Does(() => {
+        var settings = new DotNetCoreNuGetPushSettings
+        {
+            Source = EnvironmentVariable("nugetSource"),
+            ApiKey = EnvironmentVariable("nugetApiKey")
+        };
+
+        Information($"Pushing NuGet packages to {settings.Source}");
+        var nugetPackages = GetFiles($"{artifacts}/**/*.nupkg");
+        foreach(var file in nugetPackages)
+        {
+            Information($"    - Package {file}");
+            DotNetCoreNuGetPush(file.FullPath, settings);
+        }
+    });
+
 // Targets
 Task("Default")
-    .IsDependentOn("Pack");
+    .IsDependentOn("Publish");
 
 RunTarget(target);
