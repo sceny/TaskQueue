@@ -96,13 +96,14 @@ Task("ReleaseNotes")
 
 Task("Pack")
     .IsDependentOn("Version")
-    .IsDependentOn("Tests")
+    // .IsDependentOn("Tests")
     .Does(() => {
         var settings = new DotNetCorePackSettings
         {
             OutputDirectory = artifacts,
-            NoBuild = true,
-            MSBuildSettings = msbuildSettings
+            MSBuildSettings = msbuildSettings,
+            IncludeSymbols = true,
+            IncludeSource = true
         };
 
         DotNetCorePack(projectFile, settings);
@@ -113,8 +114,8 @@ Task("Publish")
     .Does(() => {
         var settings = new DotNetCoreNuGetPushSettings
         {
-            Source = EnvironmentVariable("nugetSource"),
-            ApiKey = EnvironmentVariable("nugetApiKey")
+            Source = EnvironmentVariable("NUGETSOURCE"),
+            ApiKey = EnvironmentVariable("NUGETAPIKEY")
         };
 
         Information($"Pushing NuGet packages to {settings.Source}");
