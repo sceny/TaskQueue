@@ -1,0 +1,36 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- master
+- develop
+
+variables:
+DOTNET_SDK_VERSION: '2.2.401'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: DotNetCoreInstaller@0
+  displayName: 'Use .NET Core SDK $(DOTNET_SDK_VERSION)'
+  inputs:
+    version: '$(DOTNET_SDK_VERSION)'
+
+- powershell: ./build.ps1
+  displayName: 'Execute Cake PowerShell build'
+
+- task: CopyFiles@2
+  displayName: 'Copy generated content'
+  inputs: 
+    SourceFolder: '$(Build.SourcesDirectory)/artifacts'
+    contents: '**\*' 
+    targetFolder: $(Build.ArtifactStagingDirectory)/output
+    cleanTargetFolder: true
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifact'
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
