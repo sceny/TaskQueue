@@ -12,6 +12,14 @@ var configuration = Argument("Configuration", "Release");
 // Globals
 GitVersion versionInfo;
 DotNetCoreMSBuildSettings msbuildSettings;
+bool isPullRequest;
+
+Setup(context => {
+    var pullRequestNumber = EnvironmentVariable("SYSTEM_PULLREQUEST_PULLREQUESTNUMBER");
+    isPullRequest = !string.IsNullOrWhiteSpace(pullRequestNumber);
+    if (isPullRequest)
+        Information($"Building pr #{pullRequestNumber}");
+});
 
 // Tasks
 Task("Clean")
@@ -110,6 +118,7 @@ Task("Pack")
     });
 
 Task("Publish")
+    .WithCriteria(() => !isPullRequest)
     .IsDependentOn("Pack")
     .Does(() => {
         var settings = new DotNetCoreNuGetPushSettings
