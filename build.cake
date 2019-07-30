@@ -96,14 +96,14 @@ Task("ReleaseNotes")
 
 Task("Pack")
     .IsDependentOn("Version")
-    // .IsDependentOn("Tests")
+    .IsDependentOn("Tests")
     .Does(() => {
         var settings = new DotNetCorePackSettings
         {
             OutputDirectory = artifacts,
             MSBuildSettings = msbuildSettings,
-            IncludeSymbols = true,
-            IncludeSource = true
+            IncludeSymbols = false, // --> TODO #2: Fix it and make it works on Azure DevOps pipelines
+            IncludeSource = false   // --> TODO #2: Fix it and make it works on Azure DevOps pipelines
         };
 
         DotNetCorePack(projectFile, settings);
@@ -115,7 +115,9 @@ Task("Publish")
         var settings = new DotNetCoreNuGetPushSettings
         {
             Source = EnvironmentVariable("NUGETSOURCE"),
-            ApiKey = EnvironmentVariable("NUGETAPIKEY")
+            ApiKey = EnvironmentVariable("NUGETAPIKEY"),
+            SymbolSource = EnvironmentVariable("NUGETSYMBOLSOURCE"),
+            SymbolApiKey = EnvironmentVariable("NUGETSYMBOLAPIKEY")
         };
 
         Information($"Pushing NuGet packages to {settings.Source}");
