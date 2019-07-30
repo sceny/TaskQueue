@@ -8,7 +8,7 @@ trigger:
 - develop
 
 variables:
-DOTNET_SDK_VERSION: '2.2.401'
+  DOTNET_SDK_VERSION: '2.2.401'
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -24,13 +24,12 @@ steps:
 
 - task: CopyFiles@2
   displayName: 'Copy generated content'
-  inputs: 
-    SourceFolder: '$(Build.SourcesDirectory)/artifacts'
-    contents: '**\*' 
-    targetFolder: $(Build.ArtifactStagingDirectory)/output
+  inputs:
+    contents: 'artifacts/**/*'
+    targetFolder: $(Build.ArtifactStagingDirectory)
     cleanTargetFolder: true
 
 - task: PublishBuildArtifacts@1
   displayName: 'Publish Artifact'
   inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    pathToPublish: $(Build.ArtifactStagingDirectory)

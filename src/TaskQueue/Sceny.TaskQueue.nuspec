@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package >
+    <metadata>
+        <id>$id$</id>
+        <version>$version$</version>
+        <title>$title$</title>
+        <authors>$authors$</authors>
+        <owners>$owners$</owners>
+        <license type="file">LICENSE</license>
+        <licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>
+        <projectUrl>$projectUrl$</projectUrl>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+        <description>$description$</description>
+        <releaseNotes></releaseNotes>
+        <copyright>$copyright$</copyright>
+        <tags></tags>
+    </metadata>
+</package>
