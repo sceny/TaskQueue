@@ -8,7 +8,7 @@ namespace Sceny
     public class TaskQueue: IDisposable
     {
         private bool _isDisposed = false; // To detect redundant calls
-        private bool _isDisposing = false; // To detect redundant calls
+        private bool _isDrainingOut = false; // To detect redundant calls
 
         private readonly ConcurrentQueue<TaskRunner> _tasksRunners = new ConcurrentQueue<TaskRunner>();
         private readonly SemaphoreSlim _queueProcessingPending = new SemaphoreSlim(0);
@@ -21,36 +21,37 @@ namespace Sceny
             _processQueueContinuouslyTask = ProcessQueueContinuouslyAsync(_processQueueCancellationSource.Token);
         }
 
-        public Task EnqueueAsync(Action action)
+        public Task EnqueueAsync(Action action, int delayInMilliseconds = 0)
         {
             CheckDisposed();
-            CheckDisposing();
+            CheckDrainingOut();
+            CheckDelayInMilliseconds(delayInMilliseconds);
             if (action is null)
                 throw new ArgumentNullException(nameof(action));
-            var runningTask = new TaskRunner(action);
-            _tasksRunners.Enqueue(runningTask);
-            _queueProcessingPending.Release();
-            return runningTask.Task;
+            if (delayInMilliseconds > 0)
+                EnqueueTaskRunnerDelayAsync(delayInMilliseconds);
+            var taskRunner = new TaskRunner(action);
+            return EnqueueTaskRunnerAsync(taskRunner);
         }
 
-        public Task EnqueueAsync(Func<CancellationToken, Task> actionAsync)
+        public Task EnqueueAsync(Func<CancellationToken, Task> actionAsync, int delayInMilliseconds = 0)
         {
             CheckDisposed();
-            CheckDisposing();
+            CheckDrainingOut();
+            CheckDelayInMilliseconds(delayInMilliseconds);
             if (actionAsync is null)
                 throw new ArgumentNullException(nameof(actionAsync));
-
+            if (delayInMilliseconds > 0)
+                EnqueueTaskRunnerDelayAsync(delayInMilliseconds);
             var runningTask = new TaskRunner(actionAsync);
-            _tasksRunners.Enqueue(runningTask);
-            _queueProcessingPending.Release();
-            return runningTask.Task;
+            return EnqueueTaskRunnerAsync(runningTask);
         }
 
-        public async Task DrainOutAndDisposeAsync(CancellationToken cancellationToken = default)
+        public async Task DrainOutAsync(CancellationToken cancellationToken = default)
         {
             CheckDisposed();
-            CheckDisposing();
-            _isDisposing = true;
+            CheckDrainingOut();
+            _isDrainingOut = true;
             _queueProcessingPending.Release(); // Pushing one additional processing to close the ProcessQueueContinuouslyAsync loop on _isDisposing == true
             await _processQueueContinuouslyTask;
             while (!_tasksRunners.IsEmpty)
@@ -60,15 +61,12 @@ namespace Sceny
                     break;
                 await taskRunner.RunActionAsync(cancellationToken);
             }
-            Dispose();
         }
 
         private async Task ProcessQueueContinuouslyAsync(CancellationToken cancellationToken)
         {
-            while (!_isDisposed)
+            while (!_isDisposed && !_isDrainingOut)
             {
-                if (_isDisposed || _isDisposing)
-                    break;
                 await _queueProcessingPending.WaitAsync(cancellationToken);
                 if (!_tasksRunners.TryDequeue(out var taskRunner))
                     continue;
@@ -76,10 +74,24 @@ namespace Sceny
             }
         }
 
-        private void CheckDisposing()
+        private Task EnqueueTaskRunnerDelayAsync(int delayInMilliseconds)
         {
-            if (_isDisposing)
-            throw new ObjectDisposedException(nameof(TaskQueue), "The object is being disposed and no new actions can be enqueued.");
+            Task DelayAsync(CancellationToken cancelationToken) => Task.Delay(delayInMilliseconds);
+            var taskRunner = new TaskRunner(DelayAsync);
+            return EnqueueTaskRunnerAsync(taskRunner);
+        } 
+
+        private Task EnqueueTaskRunnerAsync(TaskRunner taskRunner)
+        {
+            _tasksRunners.Enqueue(taskRunner);
+            _queueProcessingPending.Release();
+            return taskRunner.Task;
+        }
+
+        private void CheckDrainingOut()
+        {
+            if (_isDrainingOut)
+            throw new InvalidOperationException("The queue is being drained out and no new actions can be enqueued.");
         }
 
         private void CheckDisposed()
@@ -88,13 +100,19 @@ namespace Sceny
             throw new ObjectDisposedException(nameof(TaskQueue), "The object is disposed and it can not be used anymore.");
         }
 
+        private void CheckDelayInMilliseconds(int delayInMilliseconds)
+        {
+            if (delayInMilliseconds < 0)
+                throw new ArgumentOutOfRangeException(nameof(delayInMilliseconds), "The delay in milliseconds can not be negative. It should be 0 to disable it, or greater than 0.");
+        }
+
         #region IDisposable
 
         protected virtual void Dispose(bool disposing)
         {
             if (_isDisposed)
                 return;
-            _isDisposing = true;
+            _isDrainingOut = true;
             if (disposing)
             {
                 _processQueueCancellationSource?.Cancel();
@@ -103,10 +121,8 @@ namespace Sceny
             }
 
             _isDisposed = true;
-            _isDisposing = false;
         }
 
-        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
         ~TaskQueue()
         {
             Dispose(false);
