@@ -18,7 +18,7 @@ namespace Sceny.Tests
             using (var tasks = new TaskQueue())
             {
                 _ = tasks.EnqueueAsync(DoSomething);
-                await tasks.DrainOutAndDisposeAsync();
+                await tasks.DrainOutAsync();
             }
             // assert
             done.Should().BeTrue();
@@ -35,7 +35,7 @@ namespace Sceny.Tests
             {
                 somethingTask = tasks.EnqueueAsync(DoSomething);
                 await somethingTask;
-                await tasks.DrainOutAndDisposeAsync();
+                await tasks.DrainOutAsync();
             }
             // assert
             somethingTask.IsCompleted.Should().BeTrue();
@@ -55,7 +55,7 @@ namespace Sceny.Tests
             using (var tasks = new TaskQueue())
             {
                 _ = tasks.EnqueueAsync(DoSomethingAsync);
-                await tasks.DrainOutAndDisposeAsync();
+                await tasks.DrainOutAsync();
             }
             // assert
             done.Should().BeTrue();
@@ -72,7 +72,7 @@ namespace Sceny.Tests
             {
                 somethingTask = tasks.EnqueueAsync(DoSomethingAsync);
                 await somethingTask;
-                await tasks.DrainOutAndDisposeAsync();
+                await tasks.DrainOutAsync();
             }
             // assert
             somethingTask.IsCompleted.Should().BeTrue();
@@ -104,7 +104,7 @@ namespace Sceny.Tests
                 await slowTaskSource.Task;
                 await doneTask;
                 done.Should().BeTrue();
-                await tasks.DrainOutAndDisposeAsync();
+                await tasks.DrainOutAsync();
             }
         }
 
@@ -132,7 +132,7 @@ namespace Sceny.Tests
                 _ = tasks.EnqueueAsync(ct => CompletesAsync(7));
                 _ = tasks.EnqueueAsync(ct => CompletesAsync(8));
                 _ = tasks.EnqueueAsync(ct => CompletesAsync(9));
-                await tasks.DrainOutAndDisposeAsync();
+                await tasks.DrainOutAsync();
             }
             // assert
             for (var i = 1; i < completionTimes.Length; i++)
@@ -141,6 +141,86 @@ namespace Sceny.Tests
                 var previousTime = completionTimes[i-1];
                 currentTime.Should().BeAfter(previousTime, $"because execution {i} should have happened after at least 10ms from previous execution {completionTimes[i-1]:ss's'fff'ms'}");
             }
+        }
+
+        [Fact]
+        public async Task Wait_parametized_delay_before_doing_something()
+        {
+            // arrange
+            var doing = false;
+            void DoSomething() => doing = true;
+            // act
+            using (var tasks = new TaskQueue())
+            {
+                _ = tasks.EnqueueAsync(DoSomething, 15);
+                await Task.Delay(5);
+                doing.Should().BeFalse();
+                await tasks.DrainOutAsync();
+            }
+            // assert
+            doing.Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task Do_not_wait_before_doing_something_if_there_is_no_delay_configured()
+        {
+            // arrange
+            var doing = false;
+            void DoSomething() => doing = true;
+            // act
+            using (var tasks = new TaskQueue())
+            {
+                _ = tasks.EnqueueAsync(DoSomething);
+                await Task.Delay(5);
+                doing.Should().BeTrue();
+                await tasks.DrainOutAsync();
+            }
+            // assert
+            doing.Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task Wait_parametized_delay_before_doing_something_async()
+        {
+            // arrange
+            var doing = false;
+            Task DoSomethingAsync(CancellationToken token)
+            {
+                doing = true;
+                return Task.CompletedTask;
+            }
+            // act
+            using (var tasks = new TaskQueue())
+            {
+                _ = tasks.EnqueueAsync(DoSomethingAsync, 15);
+                await Task.Delay(5);
+                doing.Should().BeFalse();
+                await tasks.DrainOutAsync();
+            }
+            // assert
+            doing.Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task Do_not_wait_before_doing_something_async_if_there_is_no_delay_configured()
+        {
+            // arrange
+            var doing = false;
+            Task DoSomethingAsync(CancellationToken token)
+            {
+                doing = true;
+                return Task.CompletedTask;
+            }
+            // act
+            using (var tasks = new TaskQueue())
+            {
+                _ = tasks.EnqueueAsync(DoSomethingAsync);
+                await Task.Delay(5);
+                doing.Should().BeTrue();
+                await tasks.DrainOutAsync();
+            }
+            // assert
+            doing.Should().BeTrue();
         }
     }
 }
