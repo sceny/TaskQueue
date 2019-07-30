@@ -3,12 +3,13 @@
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
         <Title>Sceny TaskQueue</Title>
+        <RootNamespace>Sceny</RootNamespace>
         <Authors>Sceny</Authors>
         <PackageProjectUrl>https://github.com/sceny/TaskQueue</PackageProjectUrl>
         <RepositoryUrl>https://github.com/sceny/TaskQueue.git</RepositoryUrl>
         <Description>Small library to ensure a queued task sync, and async, execution.</Description>
         <Copyright>Sceny© 2019</Copyright>
-        <!-- <PackageLicenseUrl>https://licenses.nuget.org/MIT</PackageLicenseUrl> -->
+        <PackageLicenseUrl>https://licenses.nuget.org/MIT</PackageLicenseUrl>
     </PropertyGroup>
 
     <ItemGroup>

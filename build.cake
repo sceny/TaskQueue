@@ -65,8 +65,8 @@ Task("Tests")
         var settings = new DotNetCoreTestSettings
         {
             Configuration = configuration,
-            NoBuild = true,
-            NoRestore = true
+            ArgumentCustomization = args => args.Append("-l trx;LogFileName=TestResults.trx"),
+            ResultsDirectory = artifacts
         };
 
         var projectFiles = GetFiles("./tests/**/*.csproj");
