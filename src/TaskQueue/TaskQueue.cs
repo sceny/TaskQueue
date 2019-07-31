@@ -18,7 +18,7 @@ namespace Sceny
         public TaskQueue(CancellationToken cancellationToken = default)
         {
             _processQueueCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            _processQueueContinuouslyTask = ProcessQueueContinuouslyAsync(_processQueueCancellationSource.Token);
+            _processQueueContinuouslyTask = Task.Factory.StartNew(async () => await ProcessQueueContinuouslyAsync(_processQueueCancellationSource.Token), TaskCreationOptions.LongRunning);
         }
 
         public Task EnqueueAsync(Action action, int delayInMilliseconds = 0)
