@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -113,10 +115,10 @@ namespace Sceny.Tests
         {
             // arrange
             const int delayMs = 10;
-            var completionTimes = new DateTime[10];
+            var executionIndexQueue = new Queue<int>();
             async Task CompletesAsync(int index)
             {
-                completionTimes[index] = DateTime.Now;
+                executionIndexQueue.Enqueue(index);
                 await Task.Delay(delayMs);
             }
             // act
@@ -135,11 +137,10 @@ namespace Sceny.Tests
                 await tasks.DrainOutAsync();
             }
             // assert
-            for (var i = 1; i < completionTimes.Length; i++)
+            for (var expectedIndex = 0; expectedIndex < 10; expectedIndex++)
             {
-                var currentTime = completionTimes[i];
-                var previousTime = completionTimes[i-1];
-                currentTime.Should().BeAfter(previousTime, $"because execution {i} should have happened after at least 10ms from previous execution {completionTimes[i-1]:ss's'fff'ms'}");
+                var index = executionIndexQueue.Dequeue();
+                index.Should().Be(expectedIndex);
             }
         }
 
@@ -147,18 +148,19 @@ namespace Sceny.Tests
         public async Task Wait_parametized_delay_before_doing_something()
         {
             // arrange
-            var doing = false;
-            void DoSomething() => doing = true;
+            void DoSomething() { };
             // act
+            TimeSpan elapsedTime;
             using (var tasks = new TaskQueue())
             {
-                _ = tasks.EnqueueAsync(DoSomething, 25);
-                await Task.Delay(5);
-                doing.Should().BeFalse();
-                await tasks.DrainOutAsync();
+                var stopWatch = new Stopwatch();
+                stopWatch.Start();
+                await tasks.EnqueueAsync(DoSomething, 25);
+                stopWatch.Stop();
+                elapsedTime = stopWatch.Elapsed;
             }
             // assert
-            doing.Should().BeTrue();
+            elapsedTime.TotalMilliseconds.Should().BeGreaterOrEqualTo(25);
         }
 
         [Fact]
@@ -183,22 +185,19 @@ namespace Sceny.Tests
         public async Task Wait_parametized_delay_before_doing_something_async()
         {
             // arrange
-            var doing = false;
-            Task DoSomethingAsync(CancellationToken token)
-            {
-                doing = true;
-                return Task.CompletedTask;
-            }
+            Task DoSomethingAsync(CancellationToken token) => Task.CompletedTask;
             // act
+            TimeSpan elapsedTime;
             using (var tasks = new TaskQueue())
             {
-                _ = tasks.EnqueueAsync(DoSomethingAsync, 15);
-                await Task.Delay(5);
-                doing.Should().BeFalse();
-                await tasks.DrainOutAsync();
+                var stopWatch = new Stopwatch();
+                stopWatch.Start();
+                await tasks.EnqueueAsync(DoSomethingAsync, 15);
+                stopWatch.Stop();
+                elapsedTime = stopWatch.Elapsed;
             }
             // assert
-            doing.Should().BeTrue();
+            elapsedTime.TotalMilliseconds.Should().BeGreaterOrEqualTo(15);
         }
 
         [Fact]
