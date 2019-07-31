@@ -152,7 +152,7 @@ namespace Sceny.Tests
             // act
             using (var tasks = new TaskQueue())
             {
-                _ = tasks.EnqueueAsync(DoSomething, 15);
+                _ = tasks.EnqueueAsync(DoSomething, 25);
                 await Task.Delay(5);
                 doing.Should().BeFalse();
                 await tasks.DrainOutAsync();
