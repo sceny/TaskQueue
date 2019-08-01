@@ -19,7 +19,7 @@ namespace Sceny.Tests
             // act
             using (var tasks = new TaskQueue())
             {
-                _ = tasks.EnqueueAsync(DoSomething);
+                await tasks.EnqueueAsync(DoSomething);
                 await tasks.DrainOutAsync();
             }
             // assert
@@ -35,7 +35,7 @@ namespace Sceny.Tests
             Task somethingTask;
             using (var tasks = new TaskQueue())
             {
-                somethingTask = tasks.EnqueueAsync(DoSomething);
+                somethingTask = await tasks.EnqueueAsync(DoSomething);
                 await somethingTask;
                 await tasks.DrainOutAsync();
             }
@@ -44,7 +44,7 @@ namespace Sceny.Tests
         }
 
         [Fact]
-        public async Task Basic_async_task_execution()
+        public async Task Basic_async_task_execution_drained_out_waits_for_its_completion()
         {
             // arrange
             var done = false;
@@ -56,7 +56,7 @@ namespace Sceny.Tests
             // act
             using (var tasks = new TaskQueue())
             {
-                _ = tasks.EnqueueAsync(DoSomethingAsync);
+                await tasks.EnqueueAsync(DoSomethingAsync);
                 await tasks.DrainOutAsync();
             }
             // assert
@@ -72,7 +72,7 @@ namespace Sceny.Tests
             Task somethingTask;
             using (var tasks = new TaskQueue())
             {
-                somethingTask = tasks.EnqueueAsync(DoSomethingAsync);
+                somethingTask = await tasks.EnqueueAsync(DoSomethingAsync);
                 await somethingTask;
                 await tasks.DrainOutAsync();
             }
@@ -84,21 +84,27 @@ namespace Sceny.Tests
         public async Task Do_not_run_task_before_previous_completion()
         {
             // arrange
+            var slowHasBeenCompleted = false;
             var done = false;
 
             var slowTaskSource = new TaskCompletionSource<bool>();
-            Task SlowAsync(CancellationToken token) => slowTaskSource.Task;
+            Task SlowAsync(CancellationToken token)
+            {
+                slowHasBeenCompleted = true;
+                return slowTaskSource.Task;
+            }
 
             Task DoneAsync(CancellationToken token)
             {
+                slowHasBeenCompleted.Should().BeTrue();
                 done = true;
                 return Task.CompletedTask;
             }
             // act
             using (var tasks = new TaskQueue())
             {
-                _ = tasks.EnqueueAsync(SlowAsync);
-                var doneTask = tasks.EnqueueAsync(DoneAsync);
+                await tasks.EnqueueAsync(SlowAsync);
+                var doneTask = await tasks.EnqueueAsync(DoneAsync);
                 // assert
                 await Task.Delay(100);
                 done.Should().BeFalse();
@@ -124,16 +130,16 @@ namespace Sceny.Tests
             // act
             using (var tasks = new TaskQueue())
             {
-                _ = tasks.EnqueueAsync(ct => CompletesAsync(0));
-                _ = tasks.EnqueueAsync(ct => CompletesAsync(1));
-                _ = tasks.EnqueueAsync(ct => CompletesAsync(2));
-                _ = tasks.EnqueueAsync(ct => CompletesAsync(3));
-                _ = tasks.EnqueueAsync(ct => CompletesAsync(4));
-                _ = tasks.EnqueueAsync(ct => CompletesAsync(5));
-                _ = tasks.EnqueueAsync(ct => CompletesAsync(6));
-                _ = tasks.EnqueueAsync(ct => CompletesAsync(7));
-                _ = tasks.EnqueueAsync(ct => CompletesAsync(8));
-                _ = tasks.EnqueueAsync(ct => CompletesAsync(9));
+                await tasks.EnqueueAsync(ct => CompletesAsync(0));
+                await tasks.EnqueueAsync(ct => CompletesAsync(1));
+                await tasks.EnqueueAsync(ct => CompletesAsync(2));
+                await tasks.EnqueueAsync(ct => CompletesAsync(3));
+                await tasks.EnqueueAsync(ct => CompletesAsync(4));
+                await tasks.EnqueueAsync(ct => CompletesAsync(5));
+                await tasks.EnqueueAsync(ct => CompletesAsync(6));
+                await tasks.EnqueueAsync(ct => CompletesAsync(7));
+                await tasks.EnqueueAsync(ct => CompletesAsync(8));
+                await tasks.EnqueueAsync(ct => CompletesAsync(9));
                 await tasks.DrainOutAsync();
             }
             // assert
@@ -172,7 +178,7 @@ namespace Sceny.Tests
             // act
             using (var tasks = new TaskQueue())
             {
-                _ = tasks.EnqueueAsync(DoSomething);
+                await tasks.EnqueueAsync(DoSomething);
                 await Task.Delay(5);
                 doing.Should().BeTrue();
                 await tasks.DrainOutAsync();
@@ -213,7 +219,7 @@ namespace Sceny.Tests
             // act
             using (var tasks = new TaskQueue())
             {
-                _ = tasks.EnqueueAsync(DoSomethingAsync);
+                await tasks.EnqueueAsync(DoSomethingAsync);
                 await Task.Delay(5);
                 doing.Should().BeTrue();
                 await tasks.DrainOutAsync();

@@ -4,15 +4,16 @@ using System.Threading.Tasks;
 
 namespace Sceny
 {
-    public class TaskRunner
+    public class TaskRunner<T>
     {
         private CancellationTokenSource _cancelationSource;
-        private readonly TaskCompletionSource<bool> _taskCompletionSource;
+        private readonly TaskCompletionSource<T> _taskCompletionSource;
 
         private TaskRunner()
         {
             Id = Guid.NewGuid();
-            _taskCompletionSource = new TaskCompletionSource<bool>();
+            EnqueuedAt = DateTime.Now;
+            _taskCompletionSource = new TaskCompletionSource<T>();
         }
 
         public TaskRunner(Func<CancellationToken, Task> actionAsync) : this() => ActionAsync = actionAsync ?? throw new ArgumentNullException(nameof(actionAsync));
@@ -31,25 +32,33 @@ namespace Sceny
         }
 
         public Guid Id { get; }
+        public DateTimeOffset EnqueuedAt { get; }
         public Task Task => _taskCompletionSource.Task;
-        private Func<CancellationToken, Task> ActionAsync { get; }
+        private Func<CancellationToken, Task<T>> ActionAsync { get; }
 
-        public async Task RunActionAsync(CancellationToken cancellationToken = default)
+        public async Task<T> RunActionAsync(CancellationToken cancellationToken = default)
         {
             _cancelationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _ = StartActionAsync(); // rely on _taskCompletionSource to detect its completion
+            return await _taskCompletionSource.Task;
+        }
+
+        private async Task StartActionAsync()
+        {
             try
             {
-                await ActionAsync(_cancelationSource.Token);
-                _taskCompletionSource.SetResult(true);
+                var result = await ActionAsync(_cancelationSource.Token);
+                if (_cancelationSource.IsCancellationRequested)
+                    _taskCompletionSource.SetCanceled();
+                else
+                    _taskCompletionSource.SetResult(result);
             }
             catch (Exception exception)
             {
                 _taskCompletionSource.SetException(exception);
-                throw;
             }
-            await _taskCompletionSource.Task;
         }
 
-        public override string ToString() => $"Id: {Id}";
+        public override string ToString() => $"{nameof(Id)}: {Id}, {nameof(EnqueuedAt)}: {EnqueuedAt}";
     }
 }
