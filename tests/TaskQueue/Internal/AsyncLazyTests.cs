@@ -4,7 +4,7 @@ using FluentAssertions;
 using Sceny.Internal;
 using Xunit;
 
-namespace TaskQueue.Internal
+namespace Sceny.Tests.Internal
 {
     public class AsyncLazyTests
     {

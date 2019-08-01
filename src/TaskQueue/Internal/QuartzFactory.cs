@@ -17,19 +17,20 @@ namespace Sceny.Internal
             .WithIdentity($"{QuartzPrefix}-job", QuartzGroup)
             .Build();
 
-        public ITrigger CreateTrigger(IJobDetail job, TaskRunner taskRunner) => UpdateJobDataMap(
+        public ITrigger CreateTrigger<T>(IJobDetail job, TaskRunner<T> taskRunner) => UpdateJobDataMap(
             job,
             taskRunner,
             TriggerBuilder.Create().StartNow()
         );
 
-        public ITrigger CreateTrigger(IJobDetail job, TaskRunner taskRunner, int startDelayInMilliseconds) => UpdateJobDataMap(
+        public ITrigger CreateTrigger<T>(IJobDetail job, TaskRunner<T> taskRunner, int startDelayInMilliseconds) => UpdateJobDataMap(
             job,
             taskRunner,
-            TriggerBuilder.Create().StartAt(DateTime.UtcNow.AddMilliseconds(startDelayInMilliseconds))
+            TriggerBuilder.Create()
+                .StartAt(DateBuilder.FutureDate(startDelayInMilliseconds, IntervalUnit.Millisecond))
         );
 
-        private ITrigger UpdateJobDataMap(IJobDetail job, TaskRunner taskRunner, TriggerBuilder builder)
+        private ITrigger UpdateJobDataMap<T>(IJobDetail job, TaskRunner<T> taskRunner, TriggerBuilder builder)
         {
             if (job is null)
                 throw new ArgumentNullException(nameof(job));

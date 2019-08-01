@@ -27,6 +27,22 @@ namespace Sceny.Tests
         }
 
         [Fact]
+        public async Task Basic_sync_function_task_execution()
+        {
+            // arrange
+            bool done;
+            bool DoSomething() => true;
+            // act
+            using (var tasks = new TaskQueue())
+            {
+                done = await await tasks.EnqueueAsync(DoSomething);
+                await tasks.DrainOutAsync();
+            }
+            // assert
+            done.Should().BeTrue();
+        }
+
+        [Fact]
         public async Task Basic_sync_task_execution_can_be_waited()
         {
             // arrange
@@ -56,11 +72,28 @@ namespace Sceny.Tests
             // act
             using (var tasks = new TaskQueue())
             {
-                await tasks.EnqueueAsync(DoSomethingAsync);
+                var task = await tasks.EnqueueAsync(DoSomethingAsync);
                 await tasks.DrainOutAsync();
+                // assert
+                task.IsCompleted.Should().BeTrue();
             }
-            // assert
             done.Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task Basic_async_function_task_execution_drained_out_waits_for_its_completion()
+        {
+            // arrange
+            Task<bool> DoSomethingAsync(CancellationToken token) => Task.FromResult(true);
+            // act
+            using (var tasks = new TaskQueue())
+            {
+                var task = await tasks.EnqueueAsync<bool>(DoSomethingAsync);
+                await tasks.DrainOutAsync();
+                // assert
+                task.IsCompleted.Should().BeTrue();
+                task.Result.Should().BeTrue();
+            }
         }
 
         [Fact]
@@ -120,26 +153,26 @@ namespace Sceny.Tests
         public async Task Several_tasks_with_different_execution_time_get_an_ordered_execution()
         {
             // arrange
-            const int delayMs = 10;
+            const int delayInMilliseconds = 10;
             var executionIndexQueue = new Queue<int>();
-            async Task CompletesAsync(int index)
+            async Task CompletesAsync(int index, CancellationToken cancellationToken)
             {
                 executionIndexQueue.Enqueue(index);
-                await Task.Delay(delayMs);
+                await Task.Delay(delayInMilliseconds, cancellationToken);
             }
             // act
             using (var tasks = new TaskQueue())
             {
-                await tasks.EnqueueAsync(ct => CompletesAsync(0));
-                await tasks.EnqueueAsync(ct => CompletesAsync(1));
-                await tasks.EnqueueAsync(ct => CompletesAsync(2));
-                await tasks.EnqueueAsync(ct => CompletesAsync(3));
-                await tasks.EnqueueAsync(ct => CompletesAsync(4));
-                await tasks.EnqueueAsync(ct => CompletesAsync(5));
-                await tasks.EnqueueAsync(ct => CompletesAsync(6));
-                await tasks.EnqueueAsync(ct => CompletesAsync(7));
-                await tasks.EnqueueAsync(ct => CompletesAsync(8));
-                await tasks.EnqueueAsync(ct => CompletesAsync(9));
+                await tasks.EnqueueAsync(ct => CompletesAsync(0, ct));
+                await tasks.EnqueueAsync(ct => CompletesAsync(1, ct));
+                await tasks.EnqueueAsync(ct => CompletesAsync(2, ct));
+                await tasks.EnqueueAsync(ct => CompletesAsync(3, ct));
+                await tasks.EnqueueAsync(ct => CompletesAsync(4, ct));
+                await tasks.EnqueueAsync(ct => CompletesAsync(5, ct));
+                await tasks.EnqueueAsync(ct => CompletesAsync(6, ct));
+                await tasks.EnqueueAsync(ct => CompletesAsync(7, ct));
+                await tasks.EnqueueAsync(ct => CompletesAsync(8, ct));
+                await tasks.EnqueueAsync(ct => CompletesAsync(9, ct));
                 await tasks.DrainOutAsync();
             }
             // assert
@@ -161,7 +194,7 @@ namespace Sceny.Tests
             {
                 var stopWatch = new Stopwatch();
                 stopWatch.Start();
-                await tasks.EnqueueAsync(DoSomething, 25);
+                await await tasks.EnqueueAsync(DoSomething, 25);
                 stopWatch.Stop();
                 elapsedTime = stopWatch.Elapsed;
             }
@@ -198,7 +231,7 @@ namespace Sceny.Tests
             {
                 var stopWatch = new Stopwatch();
                 stopWatch.Start();
-                await tasks.EnqueueAsync(DoSomethingAsync, 15);
+                await await tasks.EnqueueAsync(DoSomethingAsync, 15);
                 stopWatch.Stop();
                 elapsedTime = stopWatch.Elapsed;
             }

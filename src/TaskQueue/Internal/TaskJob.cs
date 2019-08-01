@@ -9,7 +9,7 @@ namespace Sceny.Internal
         public async Task Execute(IJobExecutionContext context)
         {
             var taskRunner = context.MergedJobDataMap.GetTaskRunner();
-            await taskRunner.RunActionAsync(context.CancellationToken);
+            await taskRunner.RunAsync(context.CancellationToken);
         }
     }
 }

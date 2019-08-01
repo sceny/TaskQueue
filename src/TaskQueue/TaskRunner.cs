@@ -4,51 +4,54 @@ using System.Threading.Tasks;
 
 namespace Sceny
 {
-    public class TaskRunner<T>
+    public abstract class TaskRunnerBase
     {
-        private CancellationTokenSource _cancelationSource;
-        private readonly TaskCompletionSource<T> _taskCompletionSource;
-
-        private TaskRunner()
+        protected TaskRunnerBase()
         {
             Id = Guid.NewGuid();
             EnqueuedAt = DateTime.Now;
-            _taskCompletionSource = new TaskCompletionSource<T>();
         }
-
-        public TaskRunner(Func<CancellationToken, Task> actionAsync) : this() => ActionAsync = actionAsync ?? throw new ArgumentNullException(nameof(actionAsync));
-
-        public TaskRunner(Action action) : this()
-        {
-            if (action is null)
-                throw new ArgumentNullException(nameof(action));
-
-            Task actionWrapperAsync(CancellationToken c)
-            {
-                action();
-                return Task.CompletedTask;
-            }
-            ActionAsync = actionWrapperAsync;
-        }
+        public TaskRunnerBase(Action action) : this() => Action = action ?? throw new ArgumentNullException(nameof(action));
+        public TaskRunnerBase(Func<CancellationToken, Task> actionAsync) : this() => ActionAsync = actionAsync ?? throw new ArgumentNullException(nameof(actionAsync));
+        protected Action Action { get; }
+        protected Func<CancellationToken, Task> ActionAsync { get; }
 
         public Guid Id { get; }
         public DateTimeOffset EnqueuedAt { get; }
-        public Task Task => _taskCompletionSource.Task;
-        private Func<CancellationToken, Task<T>> ActionAsync { get; }
+        public abstract Task RunAsync(CancellationToken cancellationToken = default);
+    }
 
-        public async Task<T> RunActionAsync(CancellationToken cancellationToken = default)
+    public class TaskRunner<T> : TaskRunnerBase
+    {
+        private readonly TaskCompletionSource<T> _taskCompletionSource = new TaskCompletionSource<T>();
+        public TaskRunner(Action action) : base(action) { }
+        public TaskRunner(Func<T> func) : base() => Func = func ?? throw new ArgumentNullException(nameof(func));
+        public TaskRunner(Func<CancellationToken, Task> actionAsync) : base(actionAsync) { }
+        public TaskRunner(Func<CancellationToken, Task<T>> funcAsync) : base() => FuncAsync = funcAsync ?? throw new ArgumentNullException(nameof(funcAsync));
+        private Func<T> Func { get; }
+        private Func<CancellationToken, Task<T>> FuncAsync { get; }
+
+        public Task<T> FunctionTask => _taskCompletionSource.Task;
+
+        public async Task<T> RunFunctionAsync(CancellationToken cancellationToken = default)
         {
-            _cancelationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            _ = StartActionAsync(); // rely on _taskCompletionSource to detect its completion
-            return await _taskCompletionSource.Task;
+            await RunAsync(cancellationToken);
+            return FunctionTask.Result;
         }
 
-        private async Task StartActionAsync()
+        public async override Task RunAsync(CancellationToken cancellationToken = default)
         {
             try
             {
-                var result = await ActionAsync(_cancelationSource.Token);
-                if (_cancelationSource.IsCancellationRequested)
+                T result = default;
+
+                Action?.Invoke();
+                if (ActionAsync != null) await ActionAsync?.Invoke(cancellationToken);
+
+                if (Func != null) result = Func();
+                if (FuncAsync != null) result = await FuncAsync(cancellationToken);
+
+                if (cancellationToken.IsCancellationRequested)
                     _taskCompletionSource.SetCanceled();
                 else
                     _taskCompletionSource.SetResult(result);
@@ -57,6 +60,7 @@ namespace Sceny
             {
                 _taskCompletionSource.SetException(exception);
             }
+            await FunctionTask;
         }
 
         public override string ToString() => $"{nameof(Id)}: {Id}, {nameof(EnqueuedAt)}: {EnqueuedAt}";
