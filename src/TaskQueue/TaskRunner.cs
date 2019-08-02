@@ -14,6 +14,7 @@ namespace Sceny
         public TaskRunnerBase(Action action) : this() => Action = action ?? throw new ArgumentNullException(nameof(action));
         public TaskRunnerBase(Func<CancellationToken, Task> actionAsync) : this() => ActionAsync = actionAsync ?? throw new ArgumentNullException(nameof(actionAsync));
         protected Action Action { get; }
+        public abstract Task Task { get; }
         protected Func<CancellationToken, Task> ActionAsync { get; }
 
         public Guid Id { get; }
@@ -30,7 +31,7 @@ namespace Sceny
         public TaskRunner(Func<CancellationToken, Task<T>> funcAsync) : base() => FuncAsync = funcAsync ?? throw new ArgumentNullException(nameof(funcAsync));
         private Func<T> Func { get; }
         private Func<CancellationToken, Task<T>> FuncAsync { get; }
-
+        public override Task Task => FunctionTask;
         public Task<T> FunctionTask => _taskCompletionSource.Task;
 
         public async Task<T> RunFunctionAsync(CancellationToken cancellationToken = default)
@@ -39,7 +40,7 @@ namespace Sceny
             return FunctionTask.Result;
         }
 
-        public async override Task RunAsync(CancellationToken cancellationToken = default)
+        public override async Task RunAsync(CancellationToken cancellationToken = default)
         {
             try
             {
