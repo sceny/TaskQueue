@@ -10,7 +10,7 @@ namespace Sceny
         private bool _isDisposed = false; // To detect redundant calls
         private bool _isDrainingOut = false; // To detect redundant calls
 
-        private readonly ConcurrentQueue<TaskRunner> _tasksRunners = new ConcurrentQueue<TaskRunner>();
+        private readonly ConcurrentQueue<TaskRunnerBase> _tasksRunners = new ConcurrentQueue<TaskRunnerBase>();
         private readonly SemaphoreSlim _queueProcessingPending = new SemaphoreSlim(0);
         private readonly CancellationTokenSource _processQueueCancellationSource = new CancellationTokenSource();
         private readonly Task _processQueueContinuouslyTask;
@@ -21,30 +21,55 @@ namespace Sceny
             _processQueueContinuouslyTask = Task.Factory.StartNew(async () => await ProcessQueueContinuouslyAsync(_processQueueCancellationSource.Token), TaskCreationOptions.LongRunning);
         }
 
-        public Task EnqueueAsync(Action action, int delayInMilliseconds = 0)
+        public Task Enqueue(
+            Action action,
+            int delayInMilliseconds = 0
+        )
         {
             CheckDisposed();
             CheckDrainingOut();
-            CheckDelayInMilliseconds(delayInMilliseconds);
-            if (action is null)
-                throw new ArgumentNullException(nameof(action));
-            if (delayInMilliseconds > 0)
-                EnqueueTaskRunnerDelayAsync(delayInMilliseconds);
-            var taskRunner = new TaskRunner(action);
-            return EnqueueTaskRunnerAsync(taskRunner);
+            if (action is null) throw new ArgumentNullException(nameof(action));
+            var taskRunner = new TaskRunner<bool>(action);
+            return Enqueue(taskRunner, delayInMilliseconds);
         }
 
-        public Task EnqueueAsync(Func<CancellationToken, Task> actionAsync, int delayInMilliseconds = 0)
+        public Task<T> Enqueue<T>(
+            Func<T> func,
+            int delayInMilliseconds = 0
+        )
         {
             CheckDisposed();
             CheckDrainingOut();
-            CheckDelayInMilliseconds(delayInMilliseconds);
-            if (actionAsync is null)
-                throw new ArgumentNullException(nameof(actionAsync));
-            if (delayInMilliseconds > 0)
-                EnqueueTaskRunnerDelayAsync(delayInMilliseconds);
-            var runningTask = new TaskRunner(actionAsync);
-            return EnqueueTaskRunnerAsync(runningTask);
+            if (func is null) throw new ArgumentNullException(nameof(func));
+
+            var taskRunner = new TaskRunner<T>(func);
+            return Enqueue(taskRunner, delayInMilliseconds);
+        }
+
+        public Task Enqueue(
+            Func<CancellationToken, Task> actionAsync,
+            int delayInMilliseconds = 0
+        )
+        {
+            CheckDisposed();
+            CheckDrainingOut();
+            if (actionAsync is null) throw new ArgumentNullException(nameof(actionAsync));
+
+            var taskRunner = new TaskRunner<bool>(actionAsync);
+            return Enqueue(taskRunner, delayInMilliseconds);
+        }
+
+        public Task<T> Enqueue<T>(
+            Func<CancellationToken, Task<T>> funcAsync,
+            int delayInMilliseconds = 0
+        )
+        {
+            CheckDisposed();
+            CheckDrainingOut();
+            if (funcAsync is null) throw new ArgumentNullException(nameof(funcAsync));
+
+            var taskRunner = new TaskRunner<T>(funcAsync);
+            return Enqueue(taskRunner, delayInMilliseconds);
         }
 
         public async Task DrainOutAsync(CancellationToken cancellationToken = default)
@@ -59,7 +84,7 @@ namespace Sceny
                 await _queueProcessingPending.WaitAsync(cancellationToken);
                 if (!_tasksRunners.TryDequeue(out var taskRunner))
                     break;
-                await taskRunner.RunActionAsync(cancellationToken);
+                await taskRunner.RunAsync(cancellationToken);
             }
         }
 
@@ -70,22 +95,31 @@ namespace Sceny
                 await _queueProcessingPending.WaitAsync(cancellationToken);
                 if (!_tasksRunners.TryDequeue(out var taskRunner))
                     continue;
-                await taskRunner.RunActionAsync(cancellationToken);
+                await taskRunner.RunAsync(cancellationToken);
             }
         }
 
-        private Task EnqueueTaskRunnerDelayAsync(int delayInMilliseconds)
+        private Task<T> Enqueue<T>(
+            TaskRunner<T> runner,
+            int delayInMilliseconds
+        )
         {
-            Task DelayAsync(CancellationToken cancelationToken) => Task.Delay(delayInMilliseconds);
-            var taskRunner = new TaskRunner(DelayAsync);
-            return EnqueueTaskRunnerAsync(taskRunner);
-        } 
+            if (runner is null)
+                throw new ArgumentNullException(nameof(runner));
+            CheckDelayInMilliseconds(delayInMilliseconds);
 
-        private Task EnqueueTaskRunnerAsync(TaskRunner taskRunner)
-        {
-            _tasksRunners.Enqueue(taskRunner);
+            if (delayInMilliseconds > 0)
+            {
+                var delayRunner = new TaskRunner<bool>(DelayAsync);
+                _tasksRunners.Enqueue(delayRunner);
+                _queueProcessingPending.Release();
+            }
+
+            _tasksRunners.Enqueue(runner);
             _queueProcessingPending.Release();
-            return taskRunner.Task;
+            return runner.FunctionTask;
+
+            Task DelayAsync(CancellationToken cancelationToken) => Task.Delay(delayInMilliseconds);
         }
 
         private void CheckDrainingOut()
@@ -133,7 +167,7 @@ namespace Sceny
             Dispose(true);
             GC.SuppressFinalize(this);
         }
-        
+
         #endregion
     }
 }
