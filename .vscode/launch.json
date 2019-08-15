@@ -10,11 +10,11 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/tests/TaskQueue/bin/Debug/netcoreapp2.2/Sceny.TaskQueue.Tests.dll",
+            "program": "${workspaceFolder}/tests/TaskQueue.Benchmark/bin/Debug/netcoreapp2.2/TaskQueue.Benchmark.dll",
             "args": [],
             "cwd": "${workspaceFolder}/tests/TaskQueue",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
-            "console": "internalConsole",
+            "console": "externalTerminal",
             "stopAtEntry": false
         },
         {
